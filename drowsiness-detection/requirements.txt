@@ -1,0 +1,5 @@
+# Stage 1 dependencies (a final, pinned version is produced at the end)
+opencv-python
+numpy
+mediapipe
+pygame

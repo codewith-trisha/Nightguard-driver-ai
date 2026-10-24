@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NightGuard AI - Driver Drowsiness Detection Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0a0d14',
+                        cardbg: '#121824',
+                        cardborder: '#1e293b',
+                        neoncyan: '#00f2fe',
+                        neongreen: '#10b981',
+                        neonred: '#ef4444',
+                        neonyellow: '#f59e0b',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js for Telemetry Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0d14;
+            color: #f1f5f9;
+        }
+        /* Custom Glowing Effect for Alerts */
+        .glow-green {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+        }
+        .glow-yellow {
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+        }
+        .glow-red {
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+            animation: pulse-red 1s infinite alternate;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+            100% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+        }
+        /* IR Night Vision Filter */
+        .ir-mode {
+            filter: grayscale(100%) contrast(140%) brightness(90%) sepia(30%) hue-rotate(80deg);
+        }
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(18, 24, 36, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-darkbg text-slate-100 antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-500/20">
+                <i data-lucide="shield-alert" class="w-6 h-6 text-slate-950 font-bold"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-300 to-emerald-400">
+                    NightGuard AI
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">Driver Drowsiness Detection & Accident Prevention System</p>
+            </div>
+        </div>
+
+        <!-- Global Status & Quick Controls -->
+        <div class="flex items-center space-x-4">
+            <div id="system-status-badge" class="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 glow-green">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="system-status-text">MONITORING ACTIVE</span>
+            </div>
+            
+            <button id="toggle-audio-btn" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all border border-slate-700" title="Toggle Alarm Sound">
+                <i data-lucide="volume-2" id="audio-icon" class="w-4 h-4"></i>
+            </button>
+
+            <a href="#syllabus-section" class="hidden md:flex items-center space-x-1 text-xs text-slate-400 hover:text-cyan-400 transition-colors py-2 px-3 rounded-lg hover:bg-slate-800">
+                <i data-lucide="book-open" class="w-4 h-4"></i>
+                <span>Syllabus Map</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+
+        <!-- SECTION 1: HERO & METRICS OVERVIEW -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider">Frames / Sec</span>
+                    <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                </div>
+                <div class="text-2xl lg:text-3xl font-mono font-bold text-slate-100" id="metric-fps">30.2</div>
+                <div class="text-[10px] text-emerald-400 mt-1 flex items-center">
+                    <i data-lucide="check-circle-2" class="w-3 h-3 mr-1"></i> Real-time stream
+                </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider">Eye Aspect Ratio</span>
+                    <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+                <div class="text-2xl lg:text-3xl font-mono font-bold text-emerald-400" id="metric-ear">0.32</div>
+                <div class="text-[10px] text-slate-400 mt-1">Threshold: <span id="metric-ear-thresh-display" class="font-mono text-cyan-300">0.22</span></div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider">Closure Duration</span>
+                    <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                </div>
+                <div class="text-2xl lg:text-3xl font-mono font-bold text-slate-100"><span id="metric-duration">0.0</span><span class="text-sm font-sans text-slate-400">s</span></div>
+                <div class="text-[10px] text-slate-400 mt-1">Max Trigger: <span id="metric-time-thresh-display" class="font-mono text-cyan-300">2.0s</span></div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl border border-slate-800/80">
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider">Fatigue Index</span>
+                    <i data-lucide="battery-charging" class="w-4 h-4 text-purple-400"></i>
+                </div>
+                <div class="text-2xl lg:text-3xl font-mono font-bold text-slate-100"><span id="metric-fatigue">12</span><span class="text-sm font-sans text-slate-400">%</span></div>
+                <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
+                    <div id="fatigue-bar" class="bg-gradient-to-r from-emerald-400 to-amber-400 h-1.5 rounded-full" style="width: 12%"></div>
+                </div>
+            </div>
+
+            <div class="col-span-2 md:col-span-1 glass-panel p-4 rounded-2xl border border-slate-800/80">
+                <div class="flex items-center justify-between text-slate-400 mb-2">
+                    <span class="text-xs font-medium uppercase tracking-wider">Total Blinks</span>
+                    <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i>
+                </div>
+                <div class="text-2xl lg:text-3xl font-mono font-bold text-sky-400" id="metric-blinks">24</div>
+                <div class="text-[10px] text-slate-400 mt-1">Normal Rate: ~15-20/min</div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: VISION FEED & SIMULATION CONTROL PANEL -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Video / Simulation Feed Viewport (8 Cols) -->
+            <div class="lg:col-span-8 flex flex-col space-y-4">
+                <div class="glass-panel rounded-2xl p-4 border border-slate-800 relative overflow-hidden flex flex-col">
+                    <!-- Feed Header Controls -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800/80">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                            <h2 class="text-sm font-semibold text-slate-200">AI Vision Analytics Overlay</h2>
+                        </div>
+                        
+                        <!-- Toggle Camera vs Simulation -->
+                        <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
+                            <button id="mode-sim-btn" class="px-3 py-1.5 rounded-lg font-medium transition-all bg-cyan-500 text-slate-950 font-semibold shadow">
+                                Simulation Mode
+                            </button>
+                            <button id="mode-webcam-btn" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition-all">
+                                Live Webcam
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas & Video Viewport Stack -->
+                    <div class="relative aspect-video w-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 flex items-center justify-center group">
+                        <!-- Hidden Video Element for Real Webcam -->
+                        <video id="webcam-feed" class="hidden absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
+
+                        <!-- Canvas for AI Bounding Box & Landmark Overlay -->
+                        <canvas id="vision-canvas" class="w-full h-full object-contain"></canvas>
+
+                        <!-- IR Night Vision Overlay Label -->
+                        <div id="ir-label" class="hidden absolute top-3 right-3 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-mono px-2.5 py-1 rounded-md flex items-center space-x-1.5">
+                            <i data-lucide="moon" class="w-3 h-3"></i>
+                            <span>IR NIGHT VISION ACTIVE</span>
+                        </div>
+
+                        <!-- Face Lost Warning Banner Overlay -->
+                        <div id="face-lost-overlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-amber-400 space-y-2">
+                            <i data-lucide="alert-triangle" class="w-10 h-10 animate-bounce"></i>
+                            <p class="font-semibold text-sm">DRIVER FACE OUT OF FRAME</p>
+                            <p class="text-xs text-slate-400">Reposition camera or align face with center dashboard</p>
+                        </div>
+                    </div>
+
+                    <!-- Mode Control Presets Bar -->
+                    <div class="mt-4 pt-3 border-t border-slate-800/80">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-2">Simulated Behavior Presets:</span>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <button class="preset-btn px-2.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all text-center flex flex-col items-center justify-center space-y-1 active" data-preset="normal">
+                                <i data-lucide="smile" class="w-4 h-4 text-emerald-400"></i>
+                                <span>Normal Driving</span>
+                            </button>
+                            <button class="preset-btn px-2.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all text-center flex flex-col items-center justify-center space-y-1" data-preset="blinking">
+                                <i data-lucide="eye-off" class="w-4 h-4 text-sky-400"></i>
+                                <span>Slow Blinking</span>
+                            </button>
+                            <button class="preset-btn px-2.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all text-center flex flex-col items-center justify-center space-y-1" data-preset="drowsy">
+                                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400"></i>
+                                <span>Closed Eyes (Drowsy)</span>
+                            </button>
+                            <button class="preset-btn px-2.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all text-center flex flex-col items-center justify-center space-y-1" data-preset="yawning">
+                                <i data-lucide="meh" class="w-4 h-4 text-amber-400"></i>
+                                <span>Yawning</span>
+                            </button>
+                            <button class="preset-btn px-2.5 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all text-center flex flex-col items-center justify-center space-y-1" data-preset="nodding">
+                                <i data-lucide="arrow-down-circle" class="w-4 h-4 text-purple-400"></i>
+                                <span>Head Nodding</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Settings & Threshold Adjuster Panel (4 Cols) -->
+            <div class="lg:col-span-4 flex flex-col space-y-4">
+                <div class="glass-panel rounded-2xl p-5 border border-slate-800 space-y-5 h-full">
+                    <div class="flex items-center space-x-2 border-b border-slate-800 pb-3">
+                        <i data-lucide="sliders" class="w-5 h-5 text-cyan-400"></i>
+                        <h2 class="font-semibold text-slate-200 text-sm">System Sensitivity Settings</h2>
+                    </div>
+
+                    <!-- Slider 1: EAR Threshold -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <label for="ear-slider" class="text-slate-300 font-medium">EAR Closure Threshold</label>
+                            <span id="ear-slider-val" class="font-mono font-bold text-cyan-400">0.22</span>
+                        </div>
+                        <input id="ear-slider" type="range" min="0.15" max="0.30" step="0.01" value="0.22" 
+                               class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                        <p class="text-[11px] text-slate-500">Trigger eye closure when EAR falls below this ratio value.</p>
+                    </div>
+
+                    <!-- Slider 2: Duration Threshold -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <label for="time-slider" class="text-slate-300 font-medium">Alert Time Threshold</label>
+                            <span id="time-slider-val" class="font-mono font-bold text-cyan-400">2.0s</span>
+                        </div>
+                        <input id="time-slider" type="range" min="1.0" max="4.0" step="0.2" value="2.0" 
+                               class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+                        <p class="text-[11px] text-slate-500">Continuous seconds of closed eyes required to sound alarm.</p>
+                    </div>
+
+                    <!-- Toggles -->
+                    <div class="space-y-3 pt-2 border-t border-slate-800">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="moon" class="w-4 h-4 text-emerald-400"></i>
+                                <span class="text-xs font-medium text-slate-300">Night-Vision IR Mode</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="ir-toggle" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="bell" class="w-4 h-4 text-amber-400"></i>
+                                <span class="text-xs font-medium text-slate-300">Audible Alarm Speaker</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="alarm-sound-toggle" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Alert Stage Escalation Legend -->
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 space-y-2">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Staged Alert Response Protocol</span>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                            <span class="text-slate-300">Stage 0: Normal Monitoring</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            <span class="text-slate-300">Stage 1: Early Warning (&lt; 2s closure)</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                            <span class="text-slate-300 font-bold text-rose-400">Stage 2: Critical Alarm (&gt; 2s closure)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: REAL-TIME TELEMETRY & EVENT LOGS -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Real-Time EAR Chart (7 Cols) -->
+            <div class="lg:col-span-7 glass-panel rounded-2xl p-5 border border-slate-800">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <i data-lucide="line-chart" class="w-5 h-5 text-cyan-400"></i>
+                        <h3 class="font-semibold text-slate-200 text-sm">Eye Aspect Ratio (EAR) Telemetry History</h3>
+                    </div>
+                    <span class="text-xs text-slate-400 font-mono">Live Window (30s)</span>
+                </div>
+                <div class="h-64 w-full">
+                    <canvas id="earChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Event History Table (5 Cols) -->
+            <div class="lg:col-span-5 glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="list-filter" class="w-5 h-5 text-amber-400"></i>
+                            <h3 class="font-semibold text-slate-200 text-sm">Alert Event Log History</h3>
+                        </div>
+                        <button id="clear-logs-btn" class="text-[11px] text-slate-400 hover:text-rose-400 transition-colors">Clear Log</button>
+                    </div>
+
+                    <div class="overflow-y-auto max-h-52 pr-1 space-y-2" id="event-log-container">
+                        <!-- Log Entries injected here -->
+                        <div class="text-center py-8 text-xs text-slate-500 italic">No drowsiness events logged yet. Monitoring active...</div>
+                    </div>
+                </div>
+
+                <div class="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Logs captured in active session</span>
+                    <span id="log-count" class="font-mono text-cyan-400">0 events</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: COMPUTER VISION PIPELINE & MATH FORMULA -->
+        <section class="space-y-6">
+            <div class="text-center max-w-2xl mx-auto space-y-2">
+                <h2 class="text-xl sm:text-2xl font-bold text-slate-100">How NightGuard AI Detects Fatigue</h2>
+                <p class="text-xs sm:text-sm text-slate-400">Combining real-time facial landmark detection, Euclidean geometry, and temporal thresholding to prevent vehicle collisions.</p>
+            </div>
+
+            <!-- Pipeline Visual Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="glass-panel p-4 rounded-2xl border border-slate-800 relative group hover:border-cyan-500/50 transition-all">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-mono font-bold text-sm mb-3">01</div>
+                    <h3 class="font-semibold text-sm text-slate-200 mb-1">Frame Preprocessing</h3>
+                    <p class="text-xs text-slate-400">Captures 30 FPS video feed, resizes resolution, and normalizes brightness for low-light dashboard conditions.</p>
+                </div>
+
+                <div class="glass-panel p-4 rounded-2xl border border-slate-800 relative group hover:border-cyan-500/50 transition-all">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-mono font-bold text-sm mb-3">02</div>
+                    <h3 class="font-semibold text-sm text-slate-200 mb-1">Landmark Extraction</h3>
+                    <p class="text-xs text-slate-400">Locates 6 key structural coordinates around each eye region ($p_1, p_2, p_3, p_4, p_5, p_6$).</p>
+                </div>
+
+                <div class="glass-panel p-4 rounded-2xl border border-slate-800 relative group hover:border-cyan-500/50 transition-all">
+                    <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-mono font-bold text-sm mb-3">03</div>
+                    <h3 class="font-semibold text-sm text-slate-200 mb-1">EAR Ratio Computation</h3>
+                    <p class="text-xs text-slate-400">Calculates vertical vs horizontal eye distance ratio to distinguish normal blinks from fatigue closures.</p>
+                </div>
+
+                <div class="glass-panel p-4 rounded-2xl border border-slate-800 relative group hover:border-cyan-500/50 transition-all">
+                    <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center font-mono font-bold text-sm mb-3">04</div>
+                    <h3 class="font-semibold text-sm text-slate-200 mb-1">Staged Escalation Alarm</h3>
+                    <p class="text-xs text-slate-400">Tracks closure duration over time ($t \ge 2.0s$) to trigger multi-tone audio alarms before micro-sleep occurs.</p>
+                </div>
+            </div>
+
+            <!-- Mathematical Formula Explorer -->
+            <div class="glass-panel rounded-2xl p-6 border border-slate-800 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <div class="md:col-span-7 space-y-4">
+                    <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold">
+                        <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+                        <span>Theoretical Foundation</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-100">Eye Aspect Ratio (EAR) Formula</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        The Eye Aspect Ratio (EAR) is a scalar value calculated from Euclidean distances between 6 2D facial landmark points mapped onto each eye. As the eye closes, vertical distances diminish to zero while horizontal distance remains constant.
+                    </p>
+                    
+                    <!-- Math Formula Box -->
+                    <div class="p-4 rounded-xl bg-slate-950 border border-slate-800/90 font-mono text-center text-cyan-300 text-sm sm:text-base tracking-wide overflow-x-auto">
+                        EAR = <span class="text-emerald-400">||p₂ - p₆||</span> + <span class="text-emerald-400">||p₃ - p₅||</span> / (2 · <span class="text-amber-400">||p₁ - p₄||</span>)
+                    </div>
+                </div>
+
+                <!-- SVG Eye Landmark Diagram -->
+                <div class="md:col-span-5 flex justify-center p-4 bg-slate-950/60 rounded-xl border border-slate-800">
+                    <svg viewBox="0 0 240 120" class="w-full max-w-xs h-auto">
+                        <!-- Eye Contour Outline -->
+                        <path d="M 20 60 Q 120 10 220 60 Q 120 110 20 60 Z" fill="rgba(16, 185, 129, 0.05)" stroke="#10b981" stroke-width="2"/>
+                        <!-- Iris / Pupil -->
+                        <circle cx="120" cy="60" r="22" fill="none" stroke="#00f2fe" stroke-width="2" stroke-dasharray="3 3"/>
+                        <circle cx="120" cy="60" r="8" fill="#00f2fe"/>
+                        
+                        <!-- Landmark Points p1 to p6 -->
+                        <!-- p1 (left corner) -->
+                        <circle cx="20" cy="60" r="4" fill="#f59e0b"/>
+                        <text x="8" y="64" fill="#f59e0b" font-size="10" font-family="monospace">p1</text>
+
+                        <!-- p4 (right corner) -->
+                        <circle cx="220" cy="60" r="4" fill="#f59e0b"/>
+                        <text x="225" y="64" fill="#f59e0b" font-size="10" font-family="monospace">p4</text>
+
+                        <!-- p2 & p6 (vertical pair 1) -->
+                        <circle cx="75" cy="30" r="4" fill="#10b981"/>
+                        <text x="70" y="20" fill="#10b981" font-size="10" font-family="monospace">p2</text>
+                        <circle cx="75" cy="90" r="4" fill="#10b981"/>
+                        <text x="70" y="105" fill="#10b981" font-size="10" font-family="monospace">p6</text>
+                        <line x1="75" y1="30" x2="75" y2="90" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2"/>
+
+                        <!-- p3 & p5 (vertical pair 2) -->
+                        <circle cx="165" cy="30" r="4" fill="#10b981"/>
+                        <text x="160" y="20" fill="#10b981" font-size="10" font-family="monospace">p3</text>
+                        <circle cx="165" cy="90" r="4" fill="#10b981"/>
+                        <text x="160" y="105" fill="#10b981" font-size="10" font-family="monospace">p5</text>
+                        <line x1="165" y1="30" x2="165" y2="90" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2"/>
+
+                        <!-- Horizontal line p1 - p4 -->
+                        <line x1="20" y1="60" x2="220" y2="60" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2"/>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: COURSE SYLLABUS MAPPING -->
+        <section id="syllabus-section" class="glass-panel rounded-2xl p-6 border border-slate-800 space-y-4">
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+                <i data-lucide="graduation-cap" class="w-6 h-6 text-cyan-400"></i>
+                <div>
+                    <h2 class="text-base font-bold text-slate-100">Computer Vision Syllabus Mapping (AML10351A)</h2>
+                    <p class="text-xs text-slate-400">How this project satisfies academic syllabus requirements</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit I — Image Processing</span>
+                    <p class="text-slate-300">Frame capturing, spatial scaling, RGB to grayscale conversion, histogram normalization in low-light environments.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit II — Segmentation</span>
+                    <p class="text-slate-300">Isolating facial bounding boxes and cropping region of interest (ROI) around eyes and mouth regions.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit III — Object Detection</span>
+                    <p class="text-slate-300">Feature extraction using Haar Cascades / MediaPipe Face Mesh for real-time facial landmark localization.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit IV — Geometry & 3D Vision</span>
+                    <p class="text-slate-300">Euclidean metric calculations in 2D space and head pose orientation estimation for detecting head drooping.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit V — Machine Learning Evaluation</span>
+                    <p class="text-slate-300">Precision, Recall, PERCLOS ratio computation, and latency benchmark testing across lighting conditions.</p>
+                </div>
+                <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                    <span class="font-bold text-cyan-400 uppercase tracking-wider block">Unit VI — Safety Applications</span>
+                    <p class="text-slate-300">Real-time driver assistance safety system implementation with staged audible alerts and event logging.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
+        <p>NightGuard AI — Driver Drowsiness Detection Project Prototype &bull; Built with HTML5, Canvas, Web Audio API & Tailwind CSS</p>
+    </footer>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // --- LUCIDE ICONS INITIALIZATION ---
+        lucide.createIcons();
+
+        // --- GLOBAL SYSTEM STATE ---
+        const state = {
+            mode: 'sim', // 'sim' or 'webcam'
+            preset: 'normal', // 'normal', 'blinking', 'drowsy', 'yawning', 'nodding'
+            earThreshold: 0.22,
+            timeThreshold: 2.0,
+            irMode: false,
+            audioEnabled: true,
+            
+            // Metrics
+            fps: 30,
+            currentEAR: 0.32,
+            eyesClosedStartTime: null,
+            closureDuration: 0.0,
+            fatigueLevel: 12,
+            blinkCount: 24,
+            
+            // Audio Web API
+            audioCtx: null,
+            alarmOscillator: null,
+            isAlarmPlaying: false,
+
+            // Telemetry chart data
+            earHistory: Array(30).fill(0.32),
+            timeLabels: Array(30).fill(''),
+            
+            // WebCam handle
+            webcamStream: null
+        };
+
+        // --- DOM ELEMENTS ---
+        const canvas = document.getElementById('vision-canvas');
+        const ctx = canvas.getContext('2d');
+        const videoEl = document.getElementById('webcam-feed');
+        
+        const metricFps = document.getElementById('metric-fps');
+        const metricEar = document.getElementById('metric-ear');
+        const metricDuration = document.getElementById('metric-duration');
+        const metricFatigue = document.getElementById('metric-fatigue');
+        const metricBlinks = document.getElementById('metric-blinks');
+        const fatigueBar = document.getElementById('fatigue-bar');
+
+        const systemStatusText = document.getElementById('system-status-text');
+        const systemStatusBadge = document.getElementById('system-status-badge');
+
+        const earSlider = document.getElementById('ear-slider');
+        const earSliderVal = document.getElementById('ear-slider-val');
+        const timeSlider = document.getElementById('time-slider');
+        const timeSliderVal = document.getElementById('time-slider-val');
+        const metricEarThreshDisplay = document.getElementById('metric-ear-thresh-display');
+        const metricTimeThreshDisplay = document.getElementById('metric-time-thresh-display');
+
+        const irToggle = document.getElementById('ir-toggle');
+        const irLabel = document.getElementById('ir-label');
+        const alarmSoundToggle = document.getElementById('alarm-sound-toggle');
+        const toggleAudioBtn = document.getElementById('toggle-audio-btn');
+        const audioIcon = document.getElementById('audio-icon');
+
+        const modeSimBtn = document.getElementById('mode-sim-btn');
+        const modeWebcamBtn = document.getElementById('mode-webcam-btn');
+        const eventLogContainer = document.getElementById('event-log-container');
+        const logCountEl = document.getElementById('log-count');
+        const clearLogsBtn = document.getElementById('clear-logs-btn');
+
+        let logEntries = [];
+
+        // --- RESIZE CANVAS ---
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- WEB AUDIO ALARM SYNTHESIZER ---
+        function initAudio() {
+            if (!state.audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                state.audioCtx = new AudioContext();
+            }
+        }
+
+        function triggerBeepSound(stage) {
+            if (!state.audioEnabled) return;
+            try {
+                initAudio();
+                if (state.audioCtx.state === 'suspended') {
+                    state.audioCtx.resume();
+                }
+
+                const osc = state.audioCtx.createOscillator();
+                const gain = state.audioCtx.createGain();
+
+                osc.connect(gain);
+                gain.connect(state.audioCtx.destination);
+
+                if (stage === 1) {
+                    // Soft warning beep
+                    osc.type = 'sine';
+                    osc.frequency.value = 600;
+                    gain.gain.setValueAtTime(0.15, state.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, state.audioCtx.currentTime + 0.2);
+                    osc.start();
+                    osc.stop(state.audioCtx.currentTime + 0.2);
+                } else if (stage === 2) {
+                    // Loud critical alarm pulse
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(880, state.audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(440, state.audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.3, state.audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, state.audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(state.audioCtx.currentTime + 0.3);
+                }
+            } catch (e) {
+                console.error("Audio trigger error:", e);
+            }
+        }
+
+        // --- CHART.JS INITIALIZATION ---
+        const earChartCtx = document.getElementById('earChart').getContext('2d');
+        const earChart = new Chart(earChartCtx, {
+            type: 'line',
+            data: {
+                labels: state.timeLabels,
+                datasets: [
+                    {
+                        label: 'Live EAR Value',
+                        data: state.earHistory,
+                        borderColor: '#00f2fe',
+                        borderWidth: 2,
+                        fill: true,
+                        backgroundColor: 'rgba(0, 242, 254, 0.08)',
+                        tension: 0.3,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Threshold',
+                        data: Array(30).fill(state.earThreshold),
+                        borderColor: '#ef4444',
+                        borderWidth: 1.5,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: {
+                        min: 0.05,
+                        max: 0.45,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#94a3b8', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        // --- EVENT LOGGING SYSTEM ---
+        function addLogEntry(stage, duration) {
+            const now = new Date();
+            const timestamp = now.toTimeString().split(' ')[0] + '.' + Math.floor(now.getMilliseconds()/100);
+            
+            const entry = {
+                timestamp,
+                stage,
+                duration: duration.toFixed(1)
+            };
+
+            logEntries.unshift(entry);
+            if (logEntries.length > 20) logEntries.pop();
+
+            renderLogEntries();
+        }
+
+        function renderLogEntries() {
+            if (logEntries.length === 0) {
+                eventLogContainer.innerHTML = `<div class="text-center py-8 text-xs text-slate-500 italic">No drowsiness events logged yet. Monitoring active...</div>`;
+                logCountEl.textContent = '0 events';
+                return;
+            }
+
+            logCountEl.textContent = `${logEntries.length} events`;
+            eventLogContainer.innerHTML = logEntries.map(e => `
+                <div class="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                    e.stage === 2 
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                }">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full ${e.stage === 2 ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}"></span>
+                        <span class="font-mono font-semibold">${e.timestamp}</span>
+                        <span>${e.stage === 2 ? 'Critical Alert' : 'Early Warning'}</span>
+                    </div>
+                    <span class="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-900/60 border border-slate-800">
+                        ${e.duration}s closed
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        clearLogsBtn.addEventListener('click', () => {
+            logEntries = [];
+            renderLogEntries();
+        });
+
+        // --- INTERACTIVE PRESET BUTTONS ---
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active', 'border-cyan-500', 'bg-cyan-500/10'));
+                btn.classList.add('active', 'border-cyan-500', 'bg-cyan-500/10');
+                state.preset = btn.dataset.preset;
+                
+                // If switching preset, switch back to simulation mode
+                if (state.mode === 'webcam') {
+                    setMode('sim');
+                }
+            });
+        });
+
+        // --- SETTINGS CONTROLS ---
+        earSlider.addEventListener('input', (e) => {
+            state.earThreshold = parseFloat(e.target.value);
+            earSliderVal.textContent = state.earThreshold.toFixed(2);
+            metricEarThreshDisplay.textContent = state.earThreshold.toFixed(2);
+            earChart.data.datasets[1].data = Array(30).fill(state.earThreshold);
+        });
+
+        timeSlider.addEventListener('input', (e) => {
+            state.timeThreshold = parseFloat(e.target.value);
+            timeSliderVal.textContent = state.timeThreshold.toFixed(1) + 's';
+            metricTimeThreshDisplay.textContent = state.timeThreshold.toFixed(1) + 's';
+        });
+
+        irToggle.addEventListener('change', (e) => {
+            state.irMode = e.target.checked;
+            if (state.irMode) {
+                canvas.classList.add('ir-mode');
+                videoEl.classList.add('ir-mode');
+                irLabel.classList.remove('hidden');
+            } else {
+                canvas.classList.remove('ir-mode');
+                videoEl.classList.remove('ir-mode');
+                irLabel.classList.add('hidden');
+            }
+        });
+
+        function toggleAudioState(enabled) {
+            state.audioEnabled = enabled;
+            alarmSoundToggle.checked = enabled;
+            if (enabled) {
+                audioIcon.setAttribute('data-lucide', 'volume-2');
+            } else {
+                audioIcon.setAttribute('data-lucide', 'volume-x');
+            }
+            lucide.createIcons();
+        }
+
+        alarmSoundToggle.addEventListener('change', (e) => toggleAudioState(e.target.checked));
+        toggleAudioBtn.addEventListener('click', () => toggleAudioState(!state.audioEnabled));
+
+        // --- WEBCAM VS SIMULATION MODE TOGGLE ---
+        modeSimBtn.addEventListener('click', () => setMode('sim'));
+        modeWebcamBtn.addEventListener('click', () => setMode('webcam'));
+
+        function setMode(mode) {
+            state.mode = mode;
+            if (mode === 'sim') {
+                modeSimBtn.className = "px-3 py-1.5 rounded-lg font-medium transition-all bg-cyan-500 text-slate-950 font-semibold shadow";
+                modeWebcamBtn.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition-all";
+                videoEl.classList.add('hidden');
+                if (state.webcamStream) {
+                    state.webcamStream.getTracks().forEach(track => track.stop());
+                    state.webcamStream = null;
+                }
+            } else {
+                modeWebcamBtn.className = "px-3 py-1.5 rounded-lg font-medium transition-all bg-cyan-500 text-slate-950 font-semibold shadow";
+                modeSimBtn.className = "px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition-all";
+                startWebcam();
+            }
+        }
+
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                state.webcamStream = stream;
+                videoEl.srcObject = stream;
+                videoEl.classList.remove('hidden');
+            } catch (err) {
+                alert("Could not access webcam: " + err.message + "\nReverting to simulation mode.");
+                setMode('sim');
+            }
+        }
+
+        // --- MAIN SIMULATION & DRAWING LOOP ---
+        let lastLoggedStage = 0;
+        let blinkCycleTimer = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2 + (state.preset === 'nodding' ? Math.sin(Date.now() / 300) * 20 : 0);
+
+            // --- CALCULATE SIMULATED EAR VALUE BASED ON PRESET OR NOISE ---
+            let targetEAR = 0.32;
+            blinkCycleTimer += 0.05;
+
+            if (state.preset === 'normal') {
+                // Occasional fast natural blink
+                if (Math.sin(blinkCycleTimer) > 0.95) {
+                    targetEAR = 0.08;
+                } else {
+                    targetEAR = 0.31 + Math.sin(Date.now() / 200) * 0.02;
+                }
+            } else if (state.preset === 'blinking') {
+                // Prolonged slow blinks
+                if (Math.sin(blinkCycleTimer * 0.5) > 0.3) {
+                    targetEAR = 0.12;
+                } else {
+                    targetEAR = 0.28;
+                }
+            } else if (state.preset === 'drowsy') {
+                // Eyes continuously closed
+                targetEAR = 0.07 + Math.random() * 0.03;
+            } else if (state.preset === 'yawning') {
+                // Eyes semi-closed during yawn
+                targetEAR = 0.16 + Math.sin(Date.now() / 400) * 0.03;
+            } else if (state.preset === 'nodding') {
+                targetEAR = 0.14;
+            }
+
+            state.currentEAR = targetEAR;
+
+            // --- DROWSINESS STATE ESCALATION ENGINE ---
+            if (state.currentEAR < state.earThreshold) {
+                if (!state.eyesClosedStartTime) {
+                    state.eyesClosedStartTime = Date.now();
+                }
+                state.closureDuration = (Date.now() - state.eyesClosedStartTime) / 1000;
+            } else {
+                if (state.eyesClosedStartTime && state.closureDuration < 0.2) {
+                    state.blinkCount++;
+                }
+                state.eyesClosedStartTime = null;
+                state.closureDuration = 0.0;
+            }
+
+            // Update Fatigue Level %
+            if (state.closureDuration > 0) {
+                state.fatigueLevel = Math.min(100, state.fatigueLevel + 0.2);
+            } else {
+                state.fatigueLevel = Math.max(5, state.fatigueLevel - 0.05);
+            }
+
+            // Status Banner UI State logic
+            let statusText = "MONITORING ACTIVE";
+            let statusColor = "emerald";
+            let currentStage = 0;
+
+            if (state.closureDuration >= state.timeThreshold) {
+                currentStage = 2;
+                statusText = `DROWSINESS CRITICAL ALARM! (${state.closureDuration.toFixed(1)}s)`;
+                statusColor = "red";
+                triggerBeepSound(2);
+            } else if (state.closureDuration > 0.4) {
+                currentStage = 1;
+                statusText = `EYES CLOSED WARNING (${state.closureDuration.toFixed(1)}s)`;
+                statusColor = "yellow";
+                if (Math.random() < 0.3) triggerBeepSound(1);
+            }
+
+            // Log escalation changes
+            if (currentStage !== lastLoggedStage) {
+                if (currentStage > 0) {
+                    addLogEntry(currentStage, state.closureDuration);
+                }
+                lastLoggedStage = currentStage;
+            }
+
+            // --- UPDATE DOM METRICS ---
+            metricEar.textContent = state.currentEAR.toFixed(2);
+            metricDuration.textContent = state.closureDuration.toFixed(1);
+            metricFatigue.textContent = Math.round(state.fatigueLevel);
+            fatigueBar.style.width = `${state.fatigueLevel}%`;
+            metricBlinks.textContent = state.blinkCount;
+
+            // Update Badge UI
+            if (statusColor === "emerald") {
+                systemStatusBadge.className = "px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 glow-green";
+            } else if (statusColor === "yellow") {
+                systemStatusBadge.className = "px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 bg-amber-500/10 text-amber-400 border border-amber-500/30 glow-yellow";
+            } else {
+                systemStatusBadge.className = "px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-2 bg-rose-500/20 text-rose-400 border border-rose-500/40 glow-red";
+            }
+            systemStatusText.textContent = statusText;
+
+            // --- CANVAS DRAWING (SIMULATED FACE & EYE OVERLAYS) ---
+            if (state.mode === 'sim') {
+                // Draw dark ambient background gradient
+                const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, w * 0.6);
+                bgGrad.addColorStop(0, '#1e293b');
+                bgGrad.addColorStop(1, '#020617');
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, w, h);
+
+                // Draw Head Contour
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, 110, 140, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw Bounding Box around Face
+                const boxColor = statusColor === 'red' ? '#ef4444' : statusColor === 'yellow' ? '#f59e0b' : '#00f2fe';
+                ctx.strokeStyle = boxColor;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cx - 130, cy - 160, 260, 310);
+
+                // Bounding Box Corner Reticles
+                const rLen = 15;
+                ctx.lineWidth = 3;
+                // Top-Left
+                ctx.beginPath(); ctx.moveTo(cx - 130, cy - 160 + rLen); ctx.lineTo(cx - 130, cy - 160); ctx.lineTo(cx - 130 + rLen, cy - 160); ctx.stroke();
+                // Top-Right
+                ctx.beginPath(); ctx.moveTo(cx + 130 - rLen, cy - 160); ctx.lineTo(cx + 130, cy - 160); ctx.lineTo(cx + 130, cy - 160 + rLen); ctx.stroke();
+
+                // Draw Eyes (Left & Right)
+                const eyeHeight = state.currentEAR * 80;
+                const eyeWidth = 45;
+
+                // Left Eye
+                drawEyeOverlay(ctx, cx - 50, cy - 20, eyeWidth, eyeHeight, boxColor);
+                // Right Eye
+                drawEyeOverlay(ctx, cx + 50, cy - 20, eyeWidth, eyeHeight, boxColor);
+
+                // Draw Yawning Mouth Overlay if preset is yawning
+                if (state.preset === 'yawning') {
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy + 60, 25, 35, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.stroke();
+                }
+
+                // HUD Overlay Info Text
+                ctx.fillStyle = boxColor;
+                ctx.font = '12px "JetBrains Mono", monospace';
+                ctx.fillText(`EAR: ${state.currentEAR.toFixed(2)}`, cx - 120, cy - 170);
+                ctx.fillText(`FPS: 30.0`, cx + 60, cy - 170);
+            } else {
+                // Webcam Live Mode Overlay logic on top of active video stream
+                const eyeHeight = state.currentEAR * 70;
+                ctx.strokeStyle = statusColor === 'red' ? '#ef4444' : '#10b981';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(cx - 100, cy - 120, 200, 240);
+            }
+
+            // --- TELEMETRY CHART BUFFER UPDATE ---
+            if (Math.random() < 0.2) {
+                state.earHistory.shift();
+                state.earHistory.push(state.currentEAR);
+                earChart.update('none');
+            }
+        }
+
+        function drawEyeOverlay(ctx, x, y, width, height, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+
+            // Eye Box
+            ctx.strokeRect(x - width/2, y - Math.max(8, height)/2, width, Math.max(12, height));
+
+            // Eye Landmarks Points
+            ctx.fillStyle = '#10b981';
+            const pts = [
+                {x: x - width/2, y: y},
+                {x: x + width/2, y: y},
+                {x: x - width/4, y: y - height/2},
+                {x: x + width/4, y: y - height/2},
+                {x: x - width/4, y: y + height/2},
+                {x: x + width/4, y: y + height/2}
+            ];
+
+            pts.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Start Animation Loop on window load
+        window.onload = () => {
+            animate();
+        };
+    </script>
+</body>
+</html>
